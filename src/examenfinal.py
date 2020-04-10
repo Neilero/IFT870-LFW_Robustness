@@ -182,7 +182,7 @@ classe AgglomerativeClustering et un entier X de valeur comprise entre 0 et 100
 représentant un pourcentage, et retournant la robustesse de cette instance, calculée comme
 suit :*
 
-*Générer aléatoirement 10 ensembles contenant chacun X*1960/100 données (bruit) de la
+*Générer aléatoirement 10 ensembles contenant chacun $X\times1960\div100$ données (bruit) de la
 même forme que les données utilisées (5655 dimensions) suivant la loi normale N(μ, σ2) pour
 chaque dimension telle que μ est la moyenne de la dimension et σ2 sa variance (utiliser
 numpy.random.randn par exemple). Le 11e ensemble de bruit est vide. Faire varier les
