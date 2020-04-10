@@ -59,17 +59,22 @@ data = data.groupby("target").head(40)
 data.head()
 
 # %%
+pca = PCA(100, whiten=True, random_state=0)
+data = pca.fit_transform(data.drop("target", axis=1))
+
+# %%
 def robustness(clusterings):
     len_P = 0
     same_cluster_counter = 0
+    n_pairs = len(list(combinations(range(clusterings.shape[0]), 2)))
 
-    for i, j in tqdm(combinations(range(clusterings.shape[0]), 2), total=len(list(combinations(range(clusterings.shape[0]), 2)))):
+    for i, j in tqdm(combinations(range(clusterings.shape[0]), 2), total=n_pairs):
         same_cluster_count = np.sum(clusterings[i] == clusterings[j])
 
         same_cluster_counter += same_cluster_count
         len_P += same_cluster_count > 0
 
-    return same_cluster_counter / (len_P * clusterings.shape[0])
+    return same_cluster_counter / (len_P * clusterings.shape[1])
 
 
 # %%
@@ -86,13 +91,13 @@ prédire un clustering. Calculer le score de robustesse R correspondant aux 11 c
 """
 
 # %%
-def n_clusters_robustness(model, X):
+def n_clusters_robustness(model):
     n_clusters_modifications = range(-5, 6)
-    predictions = np.zeros((X.shape[0], len(n_clusters_modifications)))
+    predictions = np.zeros((data.shape[0], len(n_clusters_modifications)))
 
-    for i, modification in tqdm(enumerate(n_clusters_modifications)):
+    for i, modification in tqdm(enumerate(n_clusters_modifications), total=len(n_clusters_modifications)):
         model.n_clusters += modification
-        prediction = model.fit_predict(X)
+        prediction = model.fit_predict(data)
         predictions[:, i] = prediction
 
     return robustness(predictions)
@@ -106,7 +111,22 @@ robuste suivant le score R ?*
 """
 
 # %%
+k_means_robustness = []
+agglomerative_clustering_robustness = []
 
+for k in range(40, 81, 20):
+    kmean = KMeans(n_clusters=k, random_state=0, n_jobs=-1)
+    agglo = AgglomerativeClustering(n_clusters=k)
+
+    k_means_robustness.append(n_clusters_robustness(kmean))
+    agglomerative_clustering_robustness.append(n_clusters_robustness(agglo))
+
+sns.heatmap([k_means_robustness, agglomerative_clustering_robustness],
+            xticklabels=range(40, 81, 20), yticklabels=["KMeans", "AgglomerativeClustering"], annot=True, fmt=".0%")
+plt.suptitle("Scores de robustesse pour KMeans et AgglomerativeClustering")
+plt.xlabel("K")
+plt.ylabel("Modèle")
+plt.show()
 
 # %%
 """
@@ -115,13 +135,23 @@ robuste suivant le score R ?*
 *Écrivez une fonction prenant en paramètre une instance du modèle DBSCAN, et
 retournant la robustesse de cette instance, calculée comme suit :*
 
-*Faire varier uniquement le paramètre eps de l’instance en lui additionnant les valeurs `[-0.5,-
-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.5]`. Pour chaque valeur du paramètre eps, entraîner le
+*Faire varier uniquement le paramètre eps de l’instance en lui additionnant les valeurs 
+`[-0.5,-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.5]`. Pour chaque valeur du paramètre eps, entraîner le
 modèle et prédire un clustering. Calculer le score de robustesse R correspondant aux 11
 clusterings obtenus.*
 """
 
 # %%
+def eps_robustness(model):
+    eps_modifications = np.arange(-0.5, 0.6, 0.1)
+    predictions = np.zeros((data.shape[0], len(eps_modifications)))
+
+    for i, modification in tqdm(enumerate(eps_modifications), total=len(eps_modifications)):
+        model.eps += modification
+        prediction = model.fit_predict(data)
+        predictions[:, i] = prediction
+
+    return robustness(predictions)
 
 
 # %%
@@ -131,7 +161,17 @@ Quel est le modèle le plus robuste suivant le score R ?*
 """
 
 # %%
+dbscan_robustness = []
 
+for eps in range(7, 10):
+    dbscan = DBSCAN(min_samples=3, eps=eps, n_jobs=-1)
+    dbscan_robustness.append(eps_robustness(dbscan))
+
+sns.heatmap([dbscan_robustness], xticklabels=range(7, 10), yticklabels=["DBSCAN"], annot=True, fmt=".0%")
+plt.suptitle("Scores de robustesse pour DBSCAN")
+plt.xlabel("eps")
+plt.ylabel("Modèle")
+plt.show()
 
 # %%
 """
@@ -152,6 +192,23 @@ correspondant aux 11 clusterings obtenus.*
 """
 
 # %%
+def noise_generator(X):
+    mu = data.mean(axis=0)
+    sigma = data.var(axis=0)
+
+    return np.random.normal(mu, sigma, (X*data.shape[0]//100, data.shape[1]))
+
+def noise_robustness(model, X):
+    predictions = np.zeros((data.shape[0], 11))
+
+    for i in tqdm(range(10)):
+        noise = noise_generator(X)
+        prediction = model.fit_predict(np.concatenate((data, noise)))
+        predictions[:, i] = prediction[:data.shape[0]]
+
+    predictions[:, 10] = model.fit_predict(data)
+
+    return robustness(predictions)
 
 
 # %%
@@ -162,7 +219,23 @@ est le modèle le plus robuste suivant le score R ?*
 """
 
 # %%
+k_means_robustness = []
+agglomerative_clustering_robustness = []
+X = 5
 
+for k in range(40, 81, 20):
+    kmean = KMeans(n_clusters=k, random_state=0, n_jobs=-1)
+    agglo = AgglomerativeClustering(n_clusters=k)
+
+    k_means_robustness.append(noise_robustness(kmean, X))
+    agglomerative_clustering_robustness.append(noise_robustness(agglo, X))
+
+sns.heatmap([k_means_robustness, agglomerative_clustering_robustness],
+            xticklabels=range(40, 81, 20), yticklabels=["KMeans", "AgglomerativeClustering"], annot=True, fmt=".0%")
+plt.suptitle("Scores de robustesse pour KMeans et AgglomerativeClustering")
+plt.xlabel("K")
+plt.ylabel("Modèle")
+plt.show()
 
 # %%
 """
@@ -190,7 +263,17 @@ pour une valeur X = 5. Quel est le modèle le plus robuste suivant le score R ?*
 
 
 # %%
+dbscan_robustness = []
 
+for eps in range(7, 10):
+    dbscan = DBSCAN(min_samples=3, eps=eps, n_jobs=-1)
+    dbscan_robustness.append(noise_robustness(dbscan, X))
+
+sns.heatmap([dbscan_robustness], xticklabels=range(7, 10), yticklabels=["DBSCAN"], annot=True, fmt=".0%")
+plt.suptitle("Scores de robustesse pour DBSCAN")
+plt.xlabel("eps")
+plt.ylabel("Modèle")
+plt.show()
 
 # %%
 """
