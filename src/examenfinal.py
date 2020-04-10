@@ -7,11 +7,11 @@ Auteur : Aurélien Vauthier (19 126 456)
 
 # %%
 from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
 from sklearn.metrics import adjusted_rand_score, make_scorer, silhouette_score
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from scipy.spatial.distance import cdist, pdist, squareform
-from itertools import product
+from itertools import combinations
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -59,6 +59,20 @@ data = data.groupby("target").head(40)
 data.head()
 
 # %%
+def robustness(clusterings):
+    len_P = 0
+    same_cluster_counter = 0
+
+    for i, j in tqdm(combinations(range(clusterings.shape[0]), 2), total=len(list(combinations(range(clusterings.shape[0]), 2)))):
+        same_cluster_count = np.sum(clusterings[i] == clusterings[j])
+
+        same_cluster_counter += same_cluster_count
+        len_P += same_cluster_count > 0
+
+    return same_cluster_counter / (len_P * clusterings.shape[0])
+
+
+# %%
 """
 ## Question 1 : Robustesse aux changement de paramètres d’un modèle KMeans ou AgglomerativeCLustering
 
@@ -72,6 +86,16 @@ prédire un clustering. Calculer le score de robustesse R correspondant aux 11 c
 """
 
 # %%
+def n_clusters_robustness(model, X):
+    n_clusters_modifications = range(-5, 6)
+    predictions = np.zeros((X.shape[0], len(n_clusters_modifications)))
+
+    for i, modification in tqdm(enumerate(n_clusters_modifications)):
+        model.n_clusters += modification
+        prediction = model.fit_predict(X)
+        predictions[:, i] = prediction
+
+    return robustness(predictions)
 
 
 # %%
