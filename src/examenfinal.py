@@ -6,6 +6,11 @@ Auteur : Aurélien Vauthier (19 126 456)
 """
 
 # %%
+"""
+## Préparation des données
+"""
+
+# %%
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
 from sklearn.metrics import adjusted_rand_score, make_scorer, silhouette_score
@@ -59,10 +64,11 @@ data = data.groupby("target").head(40)
 data.head()
 
 # %%
+# apply PCA to reduce dimensionality and increase models
 pca = PCA(100, whiten=True, random_state=0)
 data = pca.fit_transform(data.drop("target", axis=1))
 
-# %%
+
 def robustness(clusterings):
     len_P = 0
     same_cluster_counter = 0
@@ -105,8 +111,8 @@ def n_clusters_robustness(model):
 
 # %%
 """
-*Calculer la robustesse des modèles : KMeans(n_clusters=k, random_state=0) et
-AgglomerativeClustering(n_clusters=k) pour k = 40, 60 ou 80. Quel est le modèle le plus
+*Calculer la robustesse des modèles : `KMeans(n_clusters=k, random_state=0)` et
+`AgglomerativeClustering(n_clusters=k)` pour k = 40, 60 ou 80. Quel est le modèle le plus
 robuste suivant le score R ?*
 """
 
@@ -127,6 +133,16 @@ plt.suptitle("Scores de robustesse pour KMeans et AgglomerativeClustering")
 plt.xlabel("K")
 plt.ylabel("Modèle")
 plt.show()
+
+# %%
+"""
+Les résultats ci-dessus semblent démontrer d'une faible robustesse du modèle `KMeans` et une forte
+robustesse pour `AgglomerativeClustering` aux changements de l'hyperparamètre `n_clusters`. On peut aussi noter que les
+modèle sont plus robustent lorsque le nombre de clusters est élevé. On remarque aussi en particulier une nette
+amélioration pour KMeans avec 80 clusters par rapport à 40 et 60 clusters.
+
+Le meilleur modèle est donc ici `AgglomerativeClustering` avec `n_clusters=80`.
+"""
 
 # %%
 """
@@ -156,7 +172,7 @@ def eps_robustness(model):
 
 # %%
 """
-*Calculer la robustesse des modèles : DBSCAN(min_samples =3, eps=e) pour k = 7, 8 ou 9.
+*Calculer la robustesse des modèles : `DBSCAN(min_samples=3, eps=e)` pour k = 7, 8 ou 9.
 Quel est le modèle le plus robuste suivant le score R ?*
 """
 
@@ -172,6 +188,15 @@ plt.suptitle("Scores de robustesse pour DBSCAN")
 plt.xlabel("eps")
 plt.ylabel("Modèle")
 plt.show()
+
+# %%
+"""
+On remarque ici une grande résistance du modèle DBSCAN au variation d'`eps`, en particulier lorsque ce dernier est
+faible. On peut ainsi noter cette tendence des modèles de clustering à être plus robuste lorsqu'on prévilégie un grand
+nombre de clusters.
+
+Le meilleur modèle de DBSCAN est ainsi celui avec `eps=7`.
+"""
 
 # %%
 """
@@ -197,6 +222,7 @@ def noise_generator(X):
     sigma = data.var(axis=0)
 
     return np.random.normal(mu, sigma, (X*data.shape[0]//100, data.shape[1]))
+
 
 def noise_robustness(model, X):
     predictions = np.zeros((data.shape[0], 11))
@@ -231,11 +257,20 @@ for k in range(40, 81, 20):
     agglomerative_clustering_robustness.append(noise_robustness(agglo, X))
 
 sns.heatmap([k_means_robustness, agglomerative_clustering_robustness],
-            xticklabels=range(40, 81, 20), yticklabels=["KMeans", "AgglomerativeClustering"], annot=True, fmt=".0%")
+            xticklabels=range(40, 81, 20), yticklabels=["KMeans", "AgglomerativeClustering"], annot=True, fmt=".1%")
 plt.suptitle("Scores de robustesse pour KMeans et AgglomerativeClustering")
 plt.xlabel("K")
 plt.ylabel("Modèle")
 plt.show()
+
+# %%
+"""
+Les résultats ci-dessus semblent démontrer d'une faible robustesse des modèles `KMeans` et `AgglomerativeClustering`
+au bruit. On peut noter qu'`AgglomerativeClustering` est un peu plus robuste, en particulier lorsque le nombre de
+clusters est élevé.
+
+Le meilleur modèle est donc ici `AgglomerativeClustering` avec `n_clusters=80`.
+"""
 
 # %%
 """
@@ -251,16 +286,17 @@ chaque itération, entraîner le modèle et prédire un clustering. Calculer le 
 R correspondant aux 11 clusterings obtenus.*
 """
 
-
 # %%
-
+"""
+La fonction `noise_robustness` peut déjà être utilisé pour le modèle `DBSCAN` sans modifications, nous allons donc la 
+réutiliser.
+"""
 
 # %%
 """
 *Calculer la robustesse des modèles : DBSCAN(min_samples =3, eps=e) pour k = 7, 8 ou 9,
 pour une valeur X = 5. Quel est le modèle le plus robuste suivant le score R ?*
 """
-
 
 # %%
 dbscan_robustness = []
@@ -277,6 +313,12 @@ plt.show()
 
 # %%
 """
+Comme le prouve les résultats ci-dessus, le modèle DBSCAN possède une excellente robustesse au bruit gaussien. Quel que
+soit le paramètre `eps` ici choisi, nous obtenons un score de robustesse parfait.
+"""
+
+# %%
+"""
 ## Question 5 : Modèle pour la génération du bruit
 
 *Critiquez le modèle utilisé pour générer le bruit dans les Questions 3 et 4. Proposez un autre
@@ -285,7 +327,17 @@ modèle de bruit avec une justification du modèle.*
 
 # %%
 """
+Le bruit généré dans les Questions 3 et 4 est un bruit gaussien utilisant la distribution globale de toutes nos données
+en générer de nouvelles. Bien que cette méthode de génération de bruit soit très couremment utilisé, il ne s'agit ici
+que d'un type particulier de bruit. Afin de rester dans une génération de bruit blanc, nous pouvons aussi imaginer
+utiliser les cibles de nos données (contenu dans `faces.target`) pour créer différentes matrices $\mu$ et $\sigma^2$
+pour chaque réel clusters. Nous pourrions alors créer une loi Normal pour chaque cible et ainsi généré un bruit
+différent pour chacun de ces groupes.
 
+Puisque nous utlisons ici des données issues de photos, il pourrait aussi être interessant d'utiliser les différentes 
+techniques d'augmentations des données utilisées lors de l'entrainement des réseaux de vision par ordinateur (*computer
+vision*). En particulier, nous pourrions utiliser des symétries horizontales, des modififactions aléatoire 
+au contraste, à la luminosité et à la saturation des images, des rotations aléatoires...
 """
 
 # %%
