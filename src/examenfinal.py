@@ -74,7 +74,7 @@ def robustness(clusterings):
     same_cluster_counter = 0
     n_pairs = len(list(combinations(range(clusterings.shape[0]), 2)))
 
-    for i, j in tqdm(combinations(range(clusterings.shape[0]), 2), total=n_pairs):
+    for i, j in tqdm(combinations(range(clusterings.shape[0]), 2), total=n_pairs, desc="Computing robustness"):
         same_cluster_count = np.sum(clusterings[i] == clusterings[j])
 
         same_cluster_counter += same_cluster_count
@@ -100,8 +100,9 @@ prédire un clustering. Calculer le score de robustesse R correspondant aux 11 c
 def n_clusters_robustness(model):
     n_clusters_modifications = range(-5, 6)
     predictions = np.zeros((data.shape[0], len(n_clusters_modifications)))
+    desc = f"Fitting and predicting {type(model).__name__} with n_clusters={model.n_clusters}"
 
-    for i, modification in tqdm(enumerate(n_clusters_modifications), total=len(n_clusters_modifications)):
+    for i, modification in tqdm(enumerate(n_clusters_modifications), total=len(n_clusters_modifications), desc=desc):
         model.n_clusters += modification
         prediction = model.fit_predict(data)
         predictions[:, i] = prediction
@@ -132,13 +133,14 @@ sns.heatmap([k_means_robustness, agglomerative_clustering_robustness],
 plt.suptitle("Scores de robustesse pour KMeans et AgglomerativeClustering")
 plt.xlabel("K")
 plt.ylabel("Modèle")
+plt.yticks(rotation=0, va="center")
 plt.show()
 
 # %%
 """
 Les résultats ci-dessus semblent démontrer d'une faible robustesse du modèle `KMeans` et une forte
 robustesse pour `AgglomerativeClustering` aux changements de l'hyperparamètre `n_clusters`. On peut aussi noter que les
-modèle sont plus robustent lorsque le nombre de clusters est élevé. On remarque aussi en particulier une nette
+modèles sont plus robustes lorsque le nombre de clusters est élevé. On remarque aussi en particulier une nette
 amélioration pour KMeans avec 80 clusters par rapport à 40 et 60 clusters.
 
 Le meilleur modèle est donc ici `AgglomerativeClustering` avec `n_clusters=80`.
@@ -161,8 +163,9 @@ clusterings obtenus.*
 def eps_robustness(model):
     eps_modifications = np.arange(-0.5, 0.6, 0.1)
     predictions = np.zeros((data.shape[0], len(eps_modifications)))
+    desc = f"Fitting and predicting {type(model).__name__} with eps={model.eps}"
 
-    for i, modification in tqdm(enumerate(eps_modifications), total=len(eps_modifications)):
+    for i, modification in tqdm(enumerate(eps_modifications), total=len(eps_modifications), desc=desc):
         model.eps += modification
         prediction = model.fit_predict(data)
         predictions[:, i] = prediction
@@ -187,12 +190,13 @@ sns.heatmap([dbscan_robustness], xticklabels=range(7, 10), yticklabels=["DBSCAN"
 plt.suptitle("Scores de robustesse pour DBSCAN")
 plt.xlabel("eps")
 plt.ylabel("Modèle")
+plt.yticks(rotation=0, va="center")
 plt.show()
 
 # %%
 """
-On remarque ici une grande résistance du modèle DBSCAN au variation d'`eps`, en particulier lorsque ce dernier est
-faible. On peut ainsi noter cette tendence des modèles de clustering à être plus robuste lorsqu'on prévilégie un grand
+On remarque ici une grande résistance du modèle DBSCAN aux variations d'`eps`, en particulier lorsque ce dernier est
+faible. On peut ainsi noter cette tendance des modèles de clustering à être plus robuste lorsqu'on privilégie un grand
 nombre de clusters.
 
 Le meilleur modèle de DBSCAN est ainsi celui avec `eps=7`.
@@ -226,13 +230,18 @@ def noise_generator(X):
 
 def noise_robustness(model, X):
     predictions = np.zeros((data.shape[0], 11))
+    n_noise_pred = predictions.shape[1] - 1  # number of prediction with noise
+    desc = f"Fitting and predicting {type(model).__name__} with random noise"
 
-    for i in tqdm(range(10)):
-        noise = noise_generator(X)
-        prediction = model.fit_predict(np.concatenate((data, noise)))
-        predictions[:, i] = prediction[:data.shape[0]]
+    with tqdm(total=predictions.shape[1], desc=desc) as progress_bar:
+        for i in range(n_noise_pred):
+            noise = noise_generator(X)
+            prediction = model.fit_predict(np.concatenate((data, noise)))
+            predictions[:, i] = prediction[:data.shape[0]]
+            progress_bar.update(1)
 
-    predictions[:, 10] = model.fit_predict(data)
+        predictions[:, n_noise_pred] = model.fit_predict(data)
+        progress_bar.update(1)
 
     return robustness(predictions)
 
@@ -261,13 +270,13 @@ sns.heatmap([k_means_robustness, agglomerative_clustering_robustness],
 plt.suptitle("Scores de robustesse pour KMeans et AgglomerativeClustering")
 plt.xlabel("K")
 plt.ylabel("Modèle")
+plt.yticks(rotation=0, va="center")
 plt.show()
 
 # %%
 """
 Les résultats ci-dessus semblent démontrer d'une faible robustesse des modèles `KMeans` et `AgglomerativeClustering`
-au bruit. On peut noter qu'`AgglomerativeClustering` est un peu plus robuste, en particulier lorsque le nombre de
-clusters est élevé.
+au bruit indépendamment du nombre de clusters. On peut noter qu'`AgglomerativeClustering` est un peu plus robuste.
 
 Le meilleur modèle est donc ici `AgglomerativeClustering` avec `n_clusters=80`.
 """
@@ -288,7 +297,7 @@ R correspondant aux 11 clusterings obtenus.*
 
 # %%
 """
-La fonction `noise_robustness` peut déjà être utilisé pour le modèle `DBSCAN` sans modifications, nous allons donc la 
+La fonction `noise_robustness` peut déjà être utilisée pour le modèle `DBSCAN` sans modification, nous allons donc la 
 réutiliser.
 """
 
@@ -309,11 +318,12 @@ sns.heatmap([dbscan_robustness], xticklabels=range(7, 10), yticklabels=["DBSCAN"
 plt.suptitle("Scores de robustesse pour DBSCAN")
 plt.xlabel("eps")
 plt.ylabel("Modèle")
+plt.yticks(rotation=0, va="center")
 plt.show()
 
 # %%
 """
-Comme le prouve les résultats ci-dessus, le modèle DBSCAN possède une excellente robustesse au bruit gaussien. Quel que
+Comme le prouvent les résultats ci-dessus, le modèle DBSCAN possède une excellente robustesse au bruit gaussien. Quel que
 soit le paramètre `eps` ici choisi, nous obtenons un score de robustesse parfait.
 """
 
@@ -327,16 +337,21 @@ modèle de bruit avec une justification du modèle.*
 
 # %%
 """
-Le bruit généré dans les Questions 3 et 4 est un bruit gaussien utilisant la distribution globale de toutes nos données
-en générer de nouvelles. Bien que cette méthode de génération de bruit soit très couremment utilisé, il ne s'agit ici
-que d'un type particulier de bruit. Afin de rester dans une génération de bruit blanc, nous pouvons aussi imaginer
+Le bruit généré dans les questions 3 et 4 est un bruit gaussien utilisant la distribution globale de toutes nos données
+en générer de nouvelles. Bien que cette méthode de génération de bruits soit très couramment utilisée, il ne s'agit ici
+que d'un type particulier de bruit. Afin de rester dans une génération de bruits blancs, nous pouvons aussi imaginer
 utiliser les cibles de nos données (contenu dans `faces.target`) pour créer différentes matrices $\mu$ et $\sigma^2$
-pour chaque réel clusters. Nous pourrions alors créer une loi Normal pour chaque cible et ainsi généré un bruit
+pour chaque réel cluster. Nous pourrions alors créer une loi Normale pour chaque cible et ainsi générer un bruit
 différent pour chacun de ces groupes.
 
-Puisque nous utlisons ici des données issues de photos, il pourrait aussi être interessant d'utiliser les différentes 
+Par ailleurs, il serait aussi envisageable de tenter de générer d'autres types de bruits spécifiques aux photographies
+comme le [bruit poivre et sel](https://fr.wikipedia.org/wiki/Bruit_poivre_et_sel), le
+[bruit de grenaille](https://fr.wikipedia.org/wiki/Bruit_de_grenaille) ou encore le
+[grain](https://en.wikipedia.org/wiki/Film_grain).
+
+Puisque nous utilisons ici des données issues de photos, il pourrait aussi être intéressant d'utiliser les différentes 
 techniques d'augmentations des données utilisées lors de l'entrainement des réseaux de vision par ordinateur (*computer
-vision*). En particulier, nous pourrions utiliser des symétries horizontales, des modififactions aléatoire 
+vision*). En particulier, nous pourrions utiliser des symétries horizontales, des modifications aléatoires
 au contraste, à la luminosité et à la saturation des images, des rotations aléatoires...
 """
 
